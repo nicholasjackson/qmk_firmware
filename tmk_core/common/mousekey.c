@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 static report_mouse_t mouse_report = {};
 static uint8_t mousekey_repeat =  0;
 static uint8_t mousekey_accel = 0;
+static uint8_t mousekey_sticky = 8;
 
 static void mousekey_debug(void);
 
@@ -59,18 +60,22 @@ static uint16_t last_timer = 0;
 static uint8_t move_unit(void)
 {
     uint16_t unit;
+    uint8_t speed_adjust = 1;
+
     if (mousekey_accel & (1<<0)) {
-        unit = (MOUSEKEY_MOVE_DELTA * mk_max_speed)/4;
+        speed_adjust = 8;
     } else if (mousekey_accel & (1<<1)) {
-        unit = (MOUSEKEY_MOVE_DELTA * mk_max_speed)/2;
+        speed_adjust = 4;
     } else if (mousekey_accel & (1<<2)) {
-        unit = (MOUSEKEY_MOVE_DELTA * mk_max_speed);
-    } else if (mousekey_repeat == 0) {
-        unit = MOUSEKEY_MOVE_DELTA;
+        speed_adjust = 1;
+    }
+    
+    if (mousekey_repeat == 0) {
+        unit = MOUSEKEY_MOVE_DELTA / speed_adjust;
     } else if (mousekey_repeat >= mk_time_to_max) {
-        unit = MOUSEKEY_MOVE_DELTA * mk_max_speed;
+        unit = (MOUSEKEY_MOVE_DELTA * mk_max_speed) / speed_adjust;
     } else {
-        unit = (MOUSEKEY_MOVE_DELTA * mk_max_speed * mousekey_repeat) / mk_time_to_max;
+        unit = ((MOUSEKEY_MOVE_DELTA * mk_max_speed * mousekey_repeat) / mk_time_to_max) / speed_adjust;
     }
     return (unit > MOUSEKEY_MOVE_MAX ? MOUSEKEY_MOVE_MAX : (unit == 0 ? 1 : unit));
 }
@@ -78,18 +83,22 @@ static uint8_t move_unit(void)
 static uint8_t wheel_unit(void)
 {
     uint16_t unit;
+    uint8_t speed_adjust = 1;
+
     if (mousekey_accel & (1<<0)) {
-        unit = (MOUSEKEY_WHEEL_DELTA * mk_wheel_max_speed)/4;
+        speed_adjust = 8;
     } else if (mousekey_accel & (1<<1)) {
-        unit = (MOUSEKEY_WHEEL_DELTA * mk_wheel_max_speed)/2;
+        speed_adjust = 4;
     } else if (mousekey_accel & (1<<2)) {
-        unit = (MOUSEKEY_WHEEL_DELTA * mk_wheel_max_speed);
-    } else if (mousekey_repeat == 0) {
-        unit = MOUSEKEY_WHEEL_DELTA;
+        speed_adjust = 1;
+    }
+
+    if (mousekey_repeat == 0) {
+        unit = (MOUSEKEY_WHEEL_DELTA / speed_adjust);
     } else if (mousekey_repeat >= mk_wheel_time_to_max) {
-        unit = MOUSEKEY_WHEEL_DELTA * mk_wheel_max_speed;
+        unit = (MOUSEKEY_WHEEL_DELTA * mk_wheel_max_speed) / speed_adjust;
     } else {
-        unit = (MOUSEKEY_WHEEL_DELTA * mk_wheel_max_speed * mousekey_repeat) / mk_wheel_time_to_max;
+        unit = ((MOUSEKEY_WHEEL_DELTA * mk_wheel_max_speed * mousekey_repeat) / mk_wheel_time_to_max) / speed_adjust;
     }
     return (unit > MOUSEKEY_WHEEL_MAX ? MOUSEKEY_WHEEL_MAX : (unit == 0 ? 1 : unit));
 }
@@ -140,9 +149,9 @@ void mousekey_on(uint8_t code)
     else if (code == KC_MS_BTN3)     mouse_report.buttons |= MOUSE_BTN3;
     else if (code == KC_MS_BTN4)     mouse_report.buttons |= MOUSE_BTN4;
     else if (code == KC_MS_BTN5)     mouse_report.buttons |= MOUSE_BTN5;
-    else if (code == KC_MS_ACCEL0)   mousekey_accel |= (1<<0);
-    else if (code == KC_MS_ACCEL1)   mousekey_accel |= (1<<1);
-    else if (code == KC_MS_ACCEL2)   mousekey_accel |= (1<<2);
+    else if (mousekey_sticky == 0) mousekey_accel &= ~(1<<0);
+    else if (mousekey_sticky == 1) mousekey_accel &= ~(1<<1);
+    else if (mousekey_sticky == 2) mousekey_accel &= ~(1<<2);
 }
 
 void mousekey_off(uint8_t code)
@@ -160,9 +169,18 @@ void mousekey_off(uint8_t code)
     else if (code == KC_MS_BTN3) mouse_report.buttons &= ~MOUSE_BTN3;
     else if (code == KC_MS_BTN4) mouse_report.buttons &= ~MOUSE_BTN4;
     else if (code == KC_MS_BTN5) mouse_report.buttons &= ~MOUSE_BTN5;
-    else if (code == KC_MS_ACCEL0) mousekey_accel &= ~(1<<0);
-    else if (code == KC_MS_ACCEL1) mousekey_accel &= ~(1<<1);
-    else if (code == KC_MS_ACCEL2) mousekey_accel &= ~(1<<2);
+    else if (code == KC_MS_ACCEL0)  {
+      mousekey_accel |= (1<<0); 
+      mousekey_sticky = 0;
+    }
+    else if (code == KC_MS_ACCEL1) {
+      mousekey_accel |= (1<<1); 
+      mousekey_sticky = 1;
+    }
+    else if (code == KC_MS_ACCEL2) {
+      mousekey_accel |= (1<<2); 
+      mousekey_sticky = 2;
+    }
 
     if (mouse_report.x == 0 && mouse_report.y == 0 && mouse_report.v == 0 && mouse_report.h == 0)
         mousekey_repeat = 0;
